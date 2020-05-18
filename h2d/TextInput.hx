@@ -278,7 +278,8 @@ class TextInput extends Text {
 		case K.A if (K.isDown(K.CTRL)):
 			if (text != "") {
 				cursorIndex = getTextLength();
-				selectionRange = {start: 0, length: cursorIndex};
+				// selectionRange = {start: 0, length: cursorIndex};
+				selectionRange = {start: 0, length: text.length};
 				onCursorChange();
 			}
 			return;
