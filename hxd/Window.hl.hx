@@ -60,6 +60,7 @@ class Window {
 	var windowHeight = 600;
 	var curMouseX = 0;
 	var curMouseY = 0;
+<<<<<<< HEAD
 	var savedSize : { x : Int, y : Int, width : Int, height : Int };
 
 	static var CODEMAP = [for( i in 0...2048 ) i];
@@ -70,6 +71,12 @@ class Window {
 	#if heaps_vulkan
 	public static var USE_VULKAN = false;
 	#end
+=======
+
+	static var CODEMAP = #if hlsdl []; #else [for( i in 0...2048 ) i]; #end
+	#if hlsdl
+	static inline var TOUCH_SCALE = #if (hl_ver >= version("1.12.0")) 10000 #else 100 #end;
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 	#end
 
 	function new(title:String, width:Int, height:Int, fixed:Bool = false) {
@@ -78,6 +85,7 @@ class Window {
 		eventTargets = new List();
 		resizeEvents = new List();
 		#if hlsdl
+<<<<<<< HEAD
 		var sdlFlags = if (!fixed) sdl.Window.SDL_WINDOW_SHOWN | sdl.Window.SDL_WINDOW_RESIZABLE else sdl.Window.SDL_WINDOW_SHOWN;
 		#if heaps_vulkan
 		if( USE_VULKAN ) sdlFlags |= sdl.Window.SDL_WINDOW_VULKAN;
@@ -85,6 +93,10 @@ class Window {
 		window = new sdl.Window(title, width, height, sdl.Window.SDL_WINDOWPOS_CENTERED, sdl.Window.SDL_WINDOWPOS_CENTERED, sdlFlags);
 		this.windowWidth = window.width;
 		this.windowHeight = window.height;
+=======
+		final sdlFlags = if (!fixed) sdl.Window.SDL_WINDOW_SHOWN | sdl.Window.SDL_WINDOW_RESIZABLE else sdl.Window.SDL_WINDOW_SHOWN;
+		window = new sdl.Window(title, width, height, sdl.Window.SDL_WINDOWPOS_CENTERED, sdl.Window.SDL_WINDOWPOS_CENTERED, sdlFlags);
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 		#elseif hldx
 		final dxFlags = if (!fixed) dx.Window.RESIZABLE else 0;
 		window = new dx.Window(title, width, height, dx.Window.CW_USEDEFAULT, dx.Window.CW_USEDEFAULT, dxFlags);
@@ -131,6 +143,7 @@ class Window {
 
 	public function resize( width : Int, height : Int ) : Void {
 		#if (hldx || hlsdl)
+<<<<<<< HEAD
 		if( window.displayMode == Fullscreen ) {
 			#if (hlsdl && hl_ver >= version("1.12.0") )
 			var cds = getCurrentDisplaySetting();
@@ -142,6 +155,8 @@ class Window {
 			}
 			#end
 		}
+=======
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 		window.resize(width, height);
 		#end
 		windowWidth = width;
@@ -370,9 +385,20 @@ class Window {
 
 		// EXTRA
 		var keys = [
+<<<<<<< HEAD
 			//K.BACKSPACE
 			//K.TAB
 			//K.ENTER
+=======
+			8 => K.BACKSPACE,
+			9 => K.TAB,
+			13 => K.ENTER,
+			16 => K.SHIFT,
+			17 => K.CTRL,
+			18 => K.ALT,
+			27 => K.ESCAPE,
+			32 => K.SPACE,
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 			1225 => K.LSHIFT,
 			1229 => K.RSHIFT,
 			1224 => K.LCTRL,
@@ -381,8 +407,11 @@ class Window {
 			1230 => K.RALT,
 			1227 => K.LEFT_WINDOW_KEY,
 			1231 => K.RIGHT_WINDOW_KEY,
+<<<<<<< HEAD
 			// K.ESCAPE
 			// K.SPACE
+=======
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 			1075 => K.PGUP,
 			1078 => K.PGDOWN,
 			1077 => K.END,
@@ -459,6 +488,7 @@ class Window {
 
 	function set_displayMode( m : DisplayMode ) : DisplayMode {
 		#if (hldx || hlsdl)
+<<<<<<< HEAD
 		var oldMode = window.displayMode;
 		#if (hl_ver >= version("1.12.0"))
 		var oldMode = window.displayMode;
@@ -597,6 +627,13 @@ class Window {
 	}
 
 	#end
+=======
+		window.displayMode = m;
+		#end
+		return displayMode;
+	}
+
+>>>>>>> 7a2ef4e8 (hlsdl: avoid conflicts between keycodes)
 	function get_title() : String {
 		#if (hldx || hlsdl)
 		return window.title;
