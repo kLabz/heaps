@@ -155,7 +155,8 @@ class System {
 			try {
 				hl.Api.setErrorHandler(reportError); // set exception trap
 			#end
-				#if ( haxe_ver >= 5 )
+				// #if ( haxe_ver >= 5 )
+				#if haxe.eventLoopRewrite
 				mainThread.events.loopOnce();
 				#elseif ( target.threaded && (haxe_ver >= 4.2) )
 				// Due to how 4.2+ timers work, instead of MainLoop, thread events have to be updated.
