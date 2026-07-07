@@ -2,6 +2,28 @@ package hxd.fs;
 
 #if (sys || nodejs)
 
+class MyFileConverter extends hxd.fs.FileConverter {
+	#if (alchimix.game == "arenfelldemo")
+	override public function new(baseDir, configuration) {
+		super(baseDir, configuration);
+		tmpDir = "_tmp/";
+	}
+	#end
+
+	override public function run( e : LocalFileSystem.LocalEntry ) {
+		var rule = getConvertRule(e.path);
+		if( e.originalFile == null )
+			e.originalFile = e.file;
+		else
+			e.file = e.originalFile;
+		if( rule == null || rule.cmd.conv == null )
+			return;
+		if (StringTools.startsWith(e.file, baseDir)) e.file = e.file.substr(baseDir.length);
+		else e.file = e.file.substr(e.file.indexOf("res/") + 4);
+		runConvert(e, rule.cmd, rule.version, rule.pt.match(Ext(_)));
+	}
+}
+
 @:allow(hxd.fs.LocalFileSystem)
 @:allow(hxd.fs.FileConverter)
 @:access(hxd.fs.LocalFileSystem)
@@ -312,7 +334,7 @@ class LocalFileSystem implements FileSystem {
 	var root : FileEntry;
 	var fileCache = new Map<String,{r:LocalEntry}>();
 	public var baseDir(default,null) : String;
-	public var convert(default,null) : FileConverter;
+	public var convert(default,null) : MyFileConverter;
 	static var isWindows = Sys.systemName() == "Windows";
 	public static var FILES_CHECK_MAX = 5;
 
@@ -337,7 +359,7 @@ class LocalFileSystem implements FileSystem {
 		}
 		baseDir = froot.split("\\").join("/");
 		if( !StringTools.endsWith(baseDir, "/") ) baseDir += "/";
-		convert = new FileConverter(baseDir, configuration);
+		convert = new MyFileConverter(baseDir, configuration);
 		root = new LocalEntry(this, "root", null, baseDir);
 	}
 
