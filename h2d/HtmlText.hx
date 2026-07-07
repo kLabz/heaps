@@ -111,9 +111,13 @@ class HtmlText extends Text {
 	var textXml : Xml;
 	var sizePos : Int;
 	var indent : Int = 0;
+	var borderCount : Int = 0;
+	var borderColor : Null<Int> = null;
 	var dropMatrix : h3d.shader.ColorMatrix;
 	var prevChar : Int;
 	var newLine : Bool;
+	var strikethrough : Bool = false;
+	public var strikeColor:Null<Int> = null;
 	var aHrefs : Array<String>;
 	var aInteractive : Interactive;
 	var htmlTags : Map<String,{?color:Int,?font:String}>;
@@ -304,6 +308,7 @@ class HtmlText extends Text {
 		}
 
 		yPos = 0;
+		@:privateAccess if (font.offsetY < 0) yPos = -1 * font.offsetY;
 		xMax = 0;
 		xMin = Math.POSITIVE_INFINITY;
 		sizePos = 0;
@@ -330,6 +335,11 @@ class HtmlText extends Text {
 		nextLine(textAlign, metrics[0].width);
 		for ( e in doc )
 			addNode(e, font, textAlign, rebuild, metrics);
+
+		if (applyBorder != null) {
+			applyBorder(true);
+			applyBorder = null;
+		}
 
 		if( xPos > xMax ) xMax = xPos;
 
@@ -389,9 +399,9 @@ class HtmlText extends Text {
 			switch( nodeName ) {
 			case "ul" | "ol":
 				indent += 4;
-				if ( !newLine ) {
+				// if ( !newLine ) {
 					makeLineBreak();
-				}
+				// }
 			case "p":
 				if ( !newLine ) {
 					makeLineBreak();
@@ -400,8 +410,11 @@ class HtmlText extends Text {
 				if ( !newLine ) {
 					makeLineBreak();
 				}
-				indent += 8;
+				indent += 7;
 			case "br":
+				makeLineBreak();
+			case "hr":
+				// TODO
 				makeLineBreak();
 			case "img":
 				// TODO: Support width/height attributes
@@ -425,6 +438,8 @@ class HtmlText extends Text {
 								if (grow > 0) {
 									h += grow;
 									bl += grow;
+								} else {
+									offset -= grow; // ?
 								}
 								metrics.push(makeLineInfo(size, Math.max(h, bl + i.dy), bl, offset));
 							default:
@@ -481,7 +496,7 @@ class HtmlText extends Text {
 					makeLineBreak();
 				}
 			case "li":
-				indent -= 8;
+				indent -= 7;
 				if ( !newLine ) {
 					makeLineBreak();
 				}
@@ -592,12 +607,40 @@ class HtmlText extends Text {
 		return t;
 	}
 
+	var applyBorder:Null<(?end:Bool)->Void> = null;
 	inline function nextLine( align : Align, size : Float )
 	{
+		if (applyBorder != null) applyBorder();
+		applyBorder = null;
+
 		switch( align ) {
 			case Left:
 				xPos = indent;
 				if (xMin > indent) xMin = indent;
+
+				if (borderCount > 0) {
+					var xPos = xPos - borderCount * 8;
+					var yPos = yPos;
+					var _borderCount = borderCount;
+
+					applyBorder = (?end:Bool = false) -> {
+						var borderCount = end ? _borderCount : alchimix.utils.NumberUtils.imin(borderCount, _borderCount);
+						var bc = borderCount;
+						while (bc > 0) {
+							var fc = font.getChar(0x2503);
+							// TODO `&& rebuild` check? not sure if actually needed..
+							if (fc != null) {
+								var prevColor = @:privateAccess glyphs.curColor.clone();
+								if (borderColor != null) glyphs.setDefaultColor(borderColor);
+								glyphs.add(xPos + (borderCount - bc) * 8 + 2, yPos, fc.t);
+								if (borderColor != null) @:privateAccess glyphs.curColor = prevColor;
+								if (end) this.yPos = yPos + Math.ceil(fc.t.height);
+							}
+							bc--;
+						}
+					}
+				}
+
 			case Right, Center, MultilineCenter, MultilineRight:
 				var max = if( align == MultilineCenter || align == MultilineRight ) hxd.Math.ceil(calcWidth) else calcWidth < 0 ? 0 : hxd.Math.ceil(realMaxWidth);
 				var k = align == Center || align == MultilineCenter ? 0.5 : 1;
@@ -772,15 +815,34 @@ class HtmlText extends Text {
 					default:
 					}
 				}
+
+			case "blockquote":
+				// TODO: left border
+				indent += 8;
+				borderCount++;
+				for( a in e.attributes() ) {
+					var v = e.get(a);
+					switch( a.toLowerCase() ) {
+					case "color":
+						if( prevColor == null ) prevColor = @:privateAccess glyphs.curColor.clone();
+						if( v.length == 4 && StringTools.fastCodeAt(v, 0) == '#'.code )
+							v = "#" + v.charAt(1) + v.charAt(1) + v.charAt(2) + v.charAt(2) + v.charAt(3) + v.charAt(3);
+						var color = Std.parseInt("0x" + v.substr(1));
+						borderColor = color;
+						glyphs.setDefaultColor(color);
+					default:
+					}
+				}
+
 			case "ul" | "ol":
 				indent += 4;
-				if (!newLine) {
+				// if (!newLine) {
 					makeLineBreak();
 					newLine = true;
 					prevChar = -1;
-				} else {
-					nextLine(align, metrics[sizePos].width);
-				}
+				// } else {
+				// 	nextLine(align, metrics[sizePos].width);
+				// }
 			case "p":
 				for( a in e.attributes() ) {
 					switch( a.toLowerCase() ) {
@@ -818,12 +880,19 @@ class HtmlText extends Text {
 				} else {
 					nextLine(align, metrics[sizePos].width);
 				}
-				indent += 8;
+				indent += 7;
 			case "b","bold":
 				if( tag?.font == null ) setFont("bold");
 			case "i","italic":
 				if( tag?.font == null ) setFont("italic");
+			case "strike":
+				strikethrough = true;
 			case "br":
+				makeLineBreak();
+				newLine = true;
+				prevChar = -1;
+			case "hr":
+				// TODO: border
 				makeLineBreak();
 				newLine = true;
 				prevChar = -1;
@@ -863,6 +932,10 @@ class HtmlText extends Text {
 				addNode(child, font, align, rebuild, metrics);
 			align = oldAlign;
 			switch( nodeName ) {
+			case "blockquote":
+				indent -= 8;
+				borderCount--;
+
 			case "ul" | "ol":
 				indent -= 4;
 				if ( newLine ) {
@@ -883,8 +956,10 @@ class HtmlText extends Text {
 					newLine = true;
 					prevChar = -1;
 				}
+			case "strike":
+				strikethrough = false;
 			case "li":
-				indent -= 8;
+				indent -= 7;
 				if ( newLine ) {
 					nextLine(align, metrics[sizePos].width);
 				}
@@ -916,7 +991,19 @@ class HtmlText extends Text {
 					var fc = font.getChar(cc);
 					if (fc != null) {
 						xPos += fc.getKerningOffset(prevChar);
-						if( rebuild ) glyphs.add(xPos, yPos + dy, fc.t);
+						if( rebuild ) {
+							glyphs.add(xPos, yPos + dy, fc.t);
+							if (strikethrough) @:privateAccess {
+								var prevColor = @:privateAccess glyphs.curColor.clone();
+								if (strikeColor != null) glyphs.setDefaultColor(strikeColor);
+								glyphs.add(
+									xPos,
+									yPos + dy + 7 + @:privateAccess font.offsetY,
+									Tile.fromColor(0xffffff, Math.ceil(fc.width), 1)
+								);
+								if (strikeColor != null) glyphs.curColor = prevColor;
+							}
+						}
 						if( yPos == 0 && fc.t.dy+dy < calcYMin ) calcYMin = fc.t.dy + dy;
 						xPos += fc.width + letterSpacing;
 					}
