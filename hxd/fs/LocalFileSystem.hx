@@ -244,7 +244,7 @@ class LocalEntry extends FileEntry {
 						onChangedDelay = haxe.Timer.delay(function() {
 							fs.convert.run(this);
 							onChanged();
-						}, 10);
+						}, 200);
 					}
 			}
 		});
