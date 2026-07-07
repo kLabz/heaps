@@ -14,6 +14,7 @@ enum LineHeightMode {
 		Only text adjusts line heights, and `<img>` tags do not affect it (partial legacy behavior).
 	**/
 	TextOnly;
+	ImageOnly;
 	/**
 		Legacy line height mode. When used, line heights remain constant based on `Text.font` variable.
 	**/
@@ -109,6 +110,7 @@ class HtmlText extends Text {
 	var xMin : Float;
 	var textXml : Xml;
 	var sizePos : Int;
+	var indent : Int = 0;
 	var dropMatrix : h3d.shader.ColorMatrix;
 	var prevChar : Int;
 	var newLine : Bool;
@@ -374,7 +376,7 @@ class HtmlText extends Text {
 
 			inline function makeLineBreak() {
 				var fontInfo = lineFont();
-				metrics.push(makeLineInfo(0, fontInfo.lineHeight, fontInfo.baseLine));
+				metrics.push(makeLineInfo(indent, fontInfo.lineHeight, fontInfo.baseLine));
 				splitNode.node = null;
 				newLine = true;
 				prevChar = -1;
@@ -385,10 +387,20 @@ class HtmlText extends Text {
 			if( tag?.font != null )
 				font = loadFont(tag.font);
 			switch( nodeName ) {
+			case "ul" | "ol":
+				indent += 4;
+				if ( !newLine ) {
+					makeLineBreak();
+				}
 			case "p":
 				if ( !newLine ) {
 					makeLineBreak();
 				}
+			case "li":
+				if ( !newLine ) {
+					makeLineBreak();
+				}
+				indent += 8;
 			case "br":
 				makeLineBreak();
 			case "img":
@@ -405,7 +417,7 @@ class HtmlText extends Text {
 						var info = metrics[metrics.length - 1];
 						// Bug: height/baseLine may be innacurate in case of sizeA sizeB<split>sizeA where sizeB is larger.
 						switch ( lineHeightMode ) {
-							case Accurate:
+							case Accurate | ImageOnly:
 								var grow = i.height - i.dy - info.baseLine;
 								var h = info.height;
 								var bl = info.baseLine;
@@ -422,7 +434,7 @@ class HtmlText extends Text {
 				} else {
 					var info = metrics[metrics.length - 1];
 					info.width = size;
-					if( lineHeightMode == Accurate ) {
+					if( lineHeightMode == Accurate || lineHeightMode == ImageOnly ) {
 						var grow = (i.height - i.dy) - info.height;
 						if( grow > 0 ) {
 							info.height += grow;
@@ -459,7 +471,17 @@ class HtmlText extends Text {
 			for( child in e )
 				buildSizes(child, font, metrics, splitNode);
 			switch( nodeName ) {
+			case "ul" | "ol":
+				indent -= 4;
+				if ( !newLine ) {
+					makeLineBreak();
+				}
 			case "p":
+				if ( !newLine ) {
+					makeLineBreak();
+				}
+			case "li":
+				indent -= 8;
 				if ( !newLine ) {
 					makeLineBreak();
 				}
@@ -471,7 +493,7 @@ class HtmlText extends Text {
 			var fontInfo = lineFont();
 			var info : LineInfo = metrics.pop();
 			var leftMargin = info.width;
-			var maxWidth = realMaxWidth < 0 ? Math.POSITIVE_INFINITY : realMaxWidth;
+			var maxWidth = (realMaxWidth < 0 ? Math.POSITIVE_INFINITY : realMaxWidth) - indent;
 			var textSplit = [], restPos = 0;
 			var x = leftMargin;
 			var breakChars = 0;
@@ -574,8 +596,8 @@ class HtmlText extends Text {
 	{
 		switch( align ) {
 			case Left:
-				xPos = 0;
-				if (xMin > 0) xMin = 0;
+				xPos = indent;
+				if (xMin > indent) xMin = indent;
 			case Right, Center, MultilineCenter, MultilineRight:
 				var max = if( align == MultilineCenter || align == MultilineRight ) hxd.Math.ceil(calcWidth) else calcWidth < 0 ? 0 : hxd.Math.ceil(realMaxWidth);
 				var k = align == Center || align == MultilineCenter ? 0.5 : 1;
@@ -750,6 +772,15 @@ class HtmlText extends Text {
 					default:
 					}
 				}
+			case "ul" | "ol":
+				indent += 4;
+				if (!newLine) {
+					makeLineBreak();
+					newLine = true;
+					prevChar = -1;
+				} else {
+					nextLine(align, metrics[sizePos].width);
+				}
 			case "p":
 				for( a in e.attributes() ) {
 					switch( a.toLowerCase() ) {
@@ -779,6 +810,15 @@ class HtmlText extends Text {
 				} else {
 					nextLine(align, metrics[sizePos].width);
 				}
+			case "li":
+				if (!newLine) {
+					makeLineBreak();
+					newLine = true;
+					prevChar = -1;
+				} else {
+					nextLine(align, metrics[sizePos].width);
+				}
+				indent += 8;
 			case "b","bold":
 				if( tag?.font == null ) setFont("bold");
 			case "i","italic":
@@ -823,6 +863,17 @@ class HtmlText extends Text {
 				addNode(child, font, align, rebuild, metrics);
 			align = oldAlign;
 			switch( nodeName ) {
+			case "ul" | "ol":
+				indent -= 4;
+				if ( newLine ) {
+					nextLine(align, metrics[sizePos].width);
+				// } else if ( sizePos < metrics.length - 2 || metrics[sizePos + 1].width != 0 ) {
+				} else {
+					// Condition avoid extra empty line if <p> was the last tag.
+					makeLineBreak();
+					newLine = true;
+					prevChar = -1;
+				}
 			case "p":
 				if ( newLine ) {
 					nextLine(align, metrics[sizePos].width);
@@ -831,6 +882,11 @@ class HtmlText extends Text {
 					makeLineBreak();
 					newLine = true;
 					prevChar = -1;
+				}
+			case "li":
+				indent -= 8;
+				if ( newLine ) {
+					nextLine(align, metrics[sizePos].width);
 				}
 			case "a":
 				if( aHrefs.length > 0 ) {
