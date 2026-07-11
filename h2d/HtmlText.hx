@@ -624,7 +624,7 @@ class HtmlText extends Text {
 					var _borderCount = borderCount;
 
 					applyBorder = (?end:Bool = false) -> {
-						var borderCount = end ? _borderCount : alchimix.utils.NumberUtils.imin(borderCount, _borderCount);
+						var borderCount = end ? _borderCount : borderCount < _borderCount ? borderCount : _borderCount;
 						var bc = borderCount;
 						while (bc > 0) {
 							var fc = font.getChar(0x2503);
