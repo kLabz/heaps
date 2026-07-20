@@ -139,6 +139,10 @@ class FileSystem implements hxd.fs.FileSystem {
 	#if target.threaded
 	var threadIdentifier : sys.thread.Tls<Null<Int>>;
 	var threadIdCache : Array<Null<Int>>;
+	// Guards thread-id allocation and the lazy per-thread FileInput. Without it two
+	// threads can be handed the same id and then interleave seek/read on one shared
+	// input, which returns corrupt bytes rather than failing.
+	var threadMutex : sys.thread.Mutex;
 	#end
 	var files : Array<{ path : String, inputs : Array<FileInput> }>;
 	public var totalReadBytes = 0;
@@ -154,6 +158,7 @@ class FileSystem implements hxd.fs.FileSystem {
 		#if target.threaded
 		threadIdCache = [];
 		threadIdentifier = new sys.thread.Tls();
+		threadMutex = new sys.thread.Mutex();
 		#end
 		root = new PakEntry(this, null, f, -1);
 	}
@@ -204,8 +209,12 @@ class FileSystem implements hxd.fs.FileSystem {
 	#if (target.threaded)
 		var id : Null<Int> = threadIdentifier.value;
 		if( id == null ) {
+			// Allocation must be atomic: id comes from threadIdCache.length, so a
+			// concurrent caller would otherwise be handed the same id.
+			threadMutex.acquire();
 			id = threadIdCache.length;
 			threadIdCache.push(id);
+			threadMutex.release();
 			threadIdentifier.value = id;
 		}
 		return id;
@@ -217,6 +226,16 @@ class FileSystem implements hxd.fs.FileSystem {
 	function getFile( pakFile : Int ) {
 		var f = files[pakFile];
 		var id = getThreadID();
+		#if target.threaded
+		// f.inputs is shared; another thread growing it must not race with this read.
+		threadMutex.acquire();
+		var input = f.inputs[id];
+		if( input == null ) {
+			input = File.read(f.path);
+			f.inputs[id] = input;
+		}
+		threadMutex.release();
+		#else
 		var input = f.inputs[id];
 		if( input == null ) {
 			#if (sys || nodejs)
@@ -226,6 +245,7 @@ class FileSystem implements hxd.fs.FileSystem {
 			#end
 			f.inputs[id] = input;
 		}
+		#end
 		return input;
 	}
 

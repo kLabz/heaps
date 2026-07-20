@@ -754,7 +754,13 @@ class GlDriver extends Driver {
 					gl.texParameteri(mode, GL.TEXTURE_WRAP_R, w);
 					gl.texParameteri(mode, GL.TEXTURE_BASE_LEVEL, startingMip);
 					#if !js
-					gl.texParameterf(mode, GL.TEXTURE_LOD_BIAS, t.lodBias);
+					// GL_TEXTURE_LOD_BIAS is desktop-GL only; GLES applies LOD bias in
+					// the shader instead. The `#if !js` guard means "not web", but the
+					// real condition is "not GLES" — on android this raised
+					// GL_INVALID_ENUM on every texture state change, which the Mali
+					// driver logs, flooding logcat and taking a driver error path.
+					if( glES == null )
+						gl.texParameterf(mode, GL.TEXTURE_LOD_BIAS, t.lodBias);
 					var hasAnisotropicFiltering = true;
 					#end
 					if( hasAnisotropicFiltering ) {
