@@ -770,15 +770,65 @@ class RenderContext extends h3d.impl.RenderContext {
 		return true;
 	}
 
+	/**
+		Flush-reason histogram (alchimix). h2d starts a new draw call whenever
+		beginDraw sees a change; counting WHY makes batching measurable instead of
+		guessed at. Note `shader-inst` means two objects used different shader
+		*instances* (compared by reference), not different values.
+	**/
+	// Costs a string build + map op per flush (~70/frame on android, measurably).
+	// Off unless -D alchimix.flushdebug; see Boot.
+	public static var DEBUG_FLUSH = false;
+	public static var flushReasons : Map<String,Int> = new Map();
+	static var shaderNames : Map<String,String> = new Map();
+
+	static function shaderName( s : hxsl.Shader ) : String {
+		if( s == null ) return "?";
+		var cl = Type.getClassName(Type.getClass(s));
+		var short = shaderNames.get(cl);
+		if( short == null ) {
+			var parts = cl.split(".");
+			short = parts[parts.length - 1];
+			shaderNames.set(cl, short);
+		}
+		return short;
+	}
+
+	static function objName( o : Dynamic ) : String {
+		if( o == null ) return "-";
+		var cl = Type.getClassName(Type.getClass(o));
+		var short = shaderNames.get(cl);
+		if( short == null ) {
+			var parts = cl.split(".");
+			short = parts[parts.length - 1];
+			shaderNames.set(cl, short);
+		}
+		return short;
+	}
+
+	static function noteFlush( reason : String ) {
+		if( !DEBUG_FLUSH ) return;
+		var v = flushReasons.get(reason);
+		flushReasons.set(reason, v == null ? 1 : v + 1);
+	}
+
 	@:access(h2d.Drawable)
 	function beginDraw(	obj : h2d.Drawable, texture : h3d.mat.Texture, isRelative : Bool, hasUVPos = false ) {
 		if( onBeginDraw != null && !onBeginDraw(obj) )
 			return false;
 
 		var stride = 8;
-		if( hasBuffering() && currentObj != null && (texture != this.texture || stride != this.stride || obj.blendMode != currentObj.blendMode || obj.filter != currentObj.filter) )
-			flush();
+		if( DEBUG_FLUSH && obj.alpha <= 0 ) noteFlush("zeroalpha:" + objName(obj) + ":" + obj.blendMode);
+		if( hasBuffering() && currentObj != null ) {
+			// Split from one combined condition so each flush can be attributed.
+			if( texture != this.texture ) { if( DEBUG_FLUSH ) noteFlush("texture"); flush(); }
+			else if( stride != this.stride ) { if( DEBUG_FLUSH ) noteFlush("stride"); flush(); }
+			else if( obj.blendMode != currentObj.blendMode ) { if( DEBUG_FLUSH ) noteFlush("blend"); flush(); }
+			else if( obj.filter != currentObj.filter ) { if( DEBUG_FLUSH ) noteFlush("filter"); flush(); }
+		}
 		var shaderChanged = needInitShaders, paramsChanged = false;
+		var paramsCulprit : hxsl.Shader = null;
+		var shaderCause : String = needInitShaders ? "needInit" : null;
 		var objShaders = obj.shaders;
 		var curShaders = currentShaders.next;
 		while( objShaders != null && curShaders != null ) {
@@ -787,15 +837,27 @@ class RenderContext extends h3d.impl.RenderContext {
 			objShaders = objShaders.next;
 			curShaders = curShaders.next;
 			var prevInst = @:privateAccess t.instance;
-			if( s != t )
+			if( s != t ) {
 				paramsChanged = true;
+				if( paramsCulprit == null ) paramsCulprit = s;
+			}
 			s.updateConstants(globals);
-			if( @:privateAccess s.instance != prevInst )
+			if( @:privateAccess s.instance != prevInst ) {
 				shaderChanged = true;
+				if( DEBUG_FLUSH && shaderCause == null ) shaderCause = "recompile:" + shaderName(s);
+			}
 		}
-		if( objShaders != null || curShaders != null || baseShader.isRelative != isRelative || baseShader.hasUVPos != hasUVPos || baseShader.killAlpha != killAlpha )
+		if( objShaders != null || curShaders != null ) {
 			shaderChanged = true;
+			// One object has shaders the other lacks: e.g. an outlined Text next to a
+			// plain Bitmap. Fixed by draw-order grouping, not by sharing instances.
+			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = "list-len:" + shaderName(objShaders != null ? objShaders.s : curShaders.s);
+		} else if( baseShader.isRelative != isRelative || baseShader.hasUVPos != hasUVPos || baseShader.killAlpha != killAlpha ) {
+			shaderChanged = true;
+			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = (baseShader.isRelative != isRelative ? "base:isRelative" : (baseShader.hasUVPos != hasUVPos ? "base:hasUVPos" : "base:killAlpha")) + ":" + objName(obj) + ">" + objName(currentObj);
+		}
 		if( shaderChanged ) {
+			if( DEBUG_FLUSH ) noteFlush(shaderCause == null ? "shader-other" : shaderCause);
 			flush();
 			baseShader.hasUVPos = hasUVPos;
 			baseShader.isRelative = isRelative;
@@ -804,6 +866,7 @@ class RenderContext extends h3d.impl.RenderContext {
 			baseShaderList.next = obj.shaders;
 			initShaders(baseShaderList);
 		} else if( paramsChanged ) {
+			if( DEBUG_FLUSH ) noteFlush("shader-inst:" + shaderName(paramsCulprit));
 			flush();
 			if( currentShaders != baseShaderList ) throw "!";
 			// the next flush will fetch their params

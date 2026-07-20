@@ -447,6 +447,10 @@ class Pad {
 			p.config = CONFIG_SDL_NINTENDO;
 		var prev = pads.get( p.index );
 		if (prev != null) {
+			// [pad-debug] TEMPORARY: a re-add of an already-registered id synthesises a
+			// disconnect for a device that never left. Suspected cause of spurious
+			// "Controller disconnected" toasts.
+			#if sys Sys.println('[pad-debug] initPad: RE-ADD of index=${p.index} name=${sp.name} -> synthesising onDisconnect'); #end
 			pads.remove( p.index );
 			prev.d.close();
 			prev.connected = false;
@@ -464,9 +468,11 @@ class Pad {
 		var p = pads.get( e.controller );
 		switch( e.type ){
 			case GControllerAdded:
+				#if sys Sys.println('[pad-debug] SDL GControllerAdded controller=${e.controller} initDone=$initDone known=${p != null}'); #end
 				if( initDone )
 					initPad(e.controller);
 			case GControllerRemoved:
+				#if sys Sys.println('[pad-debug] SDL GControllerRemoved controller=${e.controller} known=${p != null}'); #end
 				if( p != null ){
 					pads.remove( p.index );
 					p.d.close();

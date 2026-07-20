@@ -98,7 +98,17 @@ class Manager {
 
 	public var suspended : Bool = false;
 
+	/**
+		Cached bound reference to `sortChannel`.
+
+		Passing the method directly to `ListSort.sortSingleLinked` allocates a closure
+		on every call, i.e. once per frame per Manager.update() — which on hl shows up
+		as hl_alloc_closure_ptr -> hl_gc_alloc_gen and drives GC frequency.
+	**/
+	var sortChannelRef : Channel -> Channel -> Int;
+
 	private function new() {
+		sortChannelRef = sortChannel;
 		try {
 			#if usesys
 			driver = new haxe.AudioTypes.SoundDriver();
@@ -400,7 +410,7 @@ class Manager {
 		// sort channels by priority
 		// --------------------------------------------------------------------
 
-		channels = haxe.ds.ListSort.sortSingleLinked(channels, sortChannel);
+		channels = haxe.ds.ListSort.sortSingleLinked(channels, sortChannelRef);
 
 		// --------------------------------------------------------------------
 		// virtualize sounds that puts the put the audible count over the maximum number of sources

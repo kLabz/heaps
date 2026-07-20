@@ -842,6 +842,11 @@ class Object #if (domkit && !domkit_heaps) implements domkit.Model<h2d.Object> #
 	}
 
 	static var tmpPoint = new h2d.col.Point();
+	/** TEMPORARY diagnostic: skip all h2d filters, to measure their batching cost. **/
+	public static var DISABLE_FILTERS = false;
+	/** TEMPORARY diagnostic: skip only PixelOutline filters. **/
+	public static var DISABLE_OUTLINES = false;
+
 	function drawFilters( ctx : RenderContext ) {
 		if( !ctx.pushFilter(this) ) return;
 
@@ -960,8 +965,28 @@ class Object #if (domkit && !domkit_heaps) implements domkit.Model<h2d.Object> #
 		}
 	}
 
+	/**
+		Skip fully transparent subtrees (alchimix fork -- NOT upstream-safe).
+
+		drawRec only tested `visible`, so an alpha=0 object was still fully drawn:
+		geometry emitted and the batch broken (shader list and/or hasUVPos) for
+		nothing on screen. Measured ~8 such draws per frame in-game, and the invisible
+		Graphics accounted for ~5 of the remaining ~17 hasUVPos flushes.
+
+		Alpha propagates (`ctx.globalAlpha *= alpha` below), so pruning here skips the
+		whole subtree, not just this object.
+
+		Deliberately unconditional, which is why this cannot go upstream: `blendMode =
+		None` is `Out = 1*Src + 0*Dst` and ignores alpha, and a custom shader may write
+		colour without respecting it -- either could legitimately render at alpha=0.
+		This codebase has no such case, and treating alpha=0 as invisible is the
+		intended meaning here. Flip SKIP_ZERO_ALPHA to A/B it if something looks wrong.
+	**/
+	public static var SKIP_ZERO_ALPHA = true;
+
 	function drawRec( ctx : RenderContext ) {
 		if( !visible ) return;
+		if( SKIP_ZERO_ALPHA && alpha <= 0 ) return;
 		// fallback in case the object was added during a sync() event and we somehow didn't update it
 		if( posChanged ) {
 			// only sync anim, don't update() (prevent any event from occuring during draw())
@@ -971,7 +996,7 @@ class Object #if (domkit && !domkit_heaps) implements domkit.Model<h2d.Object> #
 				c.posChanged = true;
 			posChanged = false;
 		}
-		if( filter != null && filter.enable ) {
+		if( filter != null && filter.enable && !DISABLE_FILTERS && !(DISABLE_OUTLINES && Std.isOfType(filter, dn.heaps.filter.PixelOutline)) ) {
 			drawFilters(ctx);
 		} else {
 			var old = ctx.globalAlpha;
