@@ -840,7 +840,7 @@ class RenderContext extends h3d.impl.RenderContext {
 		if( DEBUG_FLUSH && obj.alpha <= 0 ) noteFlush("zeroalpha:" + objName(obj) + ":" + obj.blendMode);
 		if( hasBuffering() && currentObj != null ) {
 			// Split from one combined condition so each flush can be attributed.
-			if( texture != this.texture ) { if( DEBUG_FLUSH ) noteFlush("texture"); flush(); }
+			if( texture != this.texture ) { if( DEBUG_FLUSH ) noteFlush("texture:" + objName(obj) + ">" + objName(currentObj) + "@" + ownerName(obj) + ">" + ownerName(currentObj)); flush(); }
 			else if( stride != this.stride ) { if( DEBUG_FLUSH ) noteFlush("stride"); flush(); }
 			else if( obj.blendMode != currentObj.blendMode ) { if( DEBUG_FLUSH ) noteFlush("blend"); flush(); }
 			else if( obj.filter != currentObj.filter ) { if( DEBUG_FLUSH ) noteFlush("filter"); flush(); }
