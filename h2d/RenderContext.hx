@@ -806,6 +806,25 @@ class RenderContext extends h3d.impl.RenderContext {
 		return short;
 	}
 
+	/**
+		Nearest meaningful owner of a drawable: the outermost ancestor whose class
+		is not a generic container. Turns `Text>Bitmap` (true but unactionable) into
+		`DetailedScoring:Text>Bitmap`, which names the component to reorder.
+	**/
+	static function ownerName( o : h2d.Object ) : String {
+		var p = o == null ? null : o.parent;
+		var best : String = null;
+		while( p != null ) {
+			var n = objName(p);
+			// Roots are ancestors of everything, so they name nothing useful.
+			if( n != "Object" && n != "Flow" && n != "Layers" && n != "Scene" && n != "Mask"
+			 && n != "RootLayers" && n != "Interactive" )
+				best = n;
+			p = p.parent;
+		}
+		return best == null ? "?" : best;
+	}
+
 	static function noteFlush( reason : String ) {
 		if( !DEBUG_FLUSH ) return;
 		var v = flushReasons.get(reason);
@@ -851,10 +870,10 @@ class RenderContext extends h3d.impl.RenderContext {
 			shaderChanged = true;
 			// One object has shaders the other lacks: e.g. an outlined Text next to a
 			// plain Bitmap. Fixed by draw-order grouping, not by sharing instances.
-			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = "list-len:" + shaderName(objShaders != null ? objShaders.s : curShaders.s);
+			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = "list-len:" + shaderName(objShaders != null ? objShaders.s : curShaders.s) + "@" + ownerName(obj);
 		} else if( baseShader.isRelative != isRelative || baseShader.hasUVPos != hasUVPos || baseShader.killAlpha != killAlpha ) {
 			shaderChanged = true;
-			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = (baseShader.isRelative != isRelative ? "base:isRelative" : (baseShader.hasUVPos != hasUVPos ? "base:hasUVPos" : "base:killAlpha")) + ":" + objName(obj) + ">" + objName(currentObj);
+			if( DEBUG_FLUSH && shaderCause == null ) shaderCause = (baseShader.isRelative != isRelative ? "base:isRelative" : (baseShader.hasUVPos != hasUVPos ? "base:hasUVPos" : "base:killAlpha")) + ":" + objName(obj) + ">" + objName(currentObj) + "@" + ownerName(obj) + ">" + ownerName(currentObj);
 		}
 		if( shaderChanged ) {
 			if( DEBUG_FLUSH ) noteFlush(shaderCause == null ? "shader-other" : shaderCause);
@@ -866,7 +885,7 @@ class RenderContext extends h3d.impl.RenderContext {
 			baseShaderList.next = obj.shaders;
 			initShaders(baseShaderList);
 		} else if( paramsChanged ) {
-			if( DEBUG_FLUSH ) noteFlush("shader-inst:" + shaderName(paramsCulprit));
+			if( DEBUG_FLUSH ) noteFlush("shader-inst:" + shaderName(paramsCulprit) + "@" + ownerName(obj));
 			flush();
 			if( currentShaders != baseShaderList ) throw "!";
 			// the next flush will fetch their params
