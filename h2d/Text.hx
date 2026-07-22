@@ -414,6 +414,28 @@ class Text extends Drawable {
 		var dl = font.lineHeight + lineSpacing;
 		var t = splitRawText(text, 0, 0, lines);
 
+		// splitRawText breaks *after* the space and counts it in that line's width, so
+		// aligning on those widths shifts every wrapped line half a space to the left
+		// while the last line (no trailing space) stays put -- a centered paragraph
+		// comes out ragged. Discount the spaces the alignment is not going to see.
+		if( trimTrailingSpaces && align != Left ) {
+			var li = 0, lineStart = 0;
+			for( i in 0...t.length + 1 ) {
+				if( i < t.length && StringTools.fastCodeAt(t, i) != '\n'.code ) continue;
+				var j = i;
+				while( j > lineStart ) {
+					var cc = StringTools.fastCodeAt(t, j - 1);
+					if( !font.charset.isSpace(cc) ) break;
+					var e = font.getChar(cc);
+					var prev = j - 1 > lineStart ? StringTools.fastCodeAt(t, j - 2) : -1;
+					lines[li] -= e.width + e.getKerningOffset(prev) + (j - 1 > lineStart ? letterSpacing : 0);
+					j--;
+				}
+				li++;
+				lineStart = i + 1;
+			}
+		}
+
 		for ( lw in lines ) {
 			if ( lw > x ) x = lw;
 		}
