@@ -17,6 +17,14 @@ interface Interactive {
 
 class SceneEvents {
 
+	/**
+		Whether EOver/EOut are emitted at all. Set it to false on a touch-only
+		build: touch synthesises a move before the tap, so every Interactive lights
+		its hover state on contact and keeps it after the finger is gone, and no
+		second EMove ever arrives to clear it.
+	**/
+	public static var emitOverEvents = true;
+
 	var window : hxd.Window;
 	var scenes : Array<InteractiveScene>;
 
@@ -146,8 +154,8 @@ class SceneEvents {
 		overIndex = 0;
 		switch( event.kind ) {
 		case EMove, ECheck:
-			checkOver = true;
-			fillOver = true;
+			checkOver = emitOverEvents;
+			fillOver = emitOverEvents;
 		case EPush: cancelFocus = true; checkPush = true;
 		case ERelease: checkPush = true;
 		case EKeyUp, EKeyDown, ETextInput, EWheel:
