@@ -3,7 +3,7 @@ package hxd.fs;
 #if (sys || nodejs)
 
 class MyFileConverter extends hxd.fs.FileConverter {
-	#if (alchimix.game == "arenfelldemo")
+	#if (alchimix.game == "arenfellweb")
 	override public function new(baseDir, configuration) {
 		super(baseDir, configuration);
 		tmpDir = "_tmp/";
