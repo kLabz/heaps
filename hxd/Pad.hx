@@ -139,6 +139,36 @@ class Pad {
 		names : ["A","B","X","Y","LB","RB","LT","RT","Select","Start","LCLK","RCLK","DUp","DDown","DLeft","DRight","LX","LY","RX","RY"],
 	};
 	/**
+		Standard mapping, Nintendo pads.
+
+		The standard mapping is positional (south/east/west/north); Nintendo pads
+		have A/B and X/Y labels swapped relative to those positions, so remap to
+		stay label-based like the other configs.
+	**/
+	public static var CONFIG_JS_NINTENDO = {
+		A : 1,
+		B : 0,
+		X : 3,
+		Y : 2,
+		LB : 4,
+		RB : 5,
+		LT : 6,
+		RT : 7,
+		back : 8,
+		start : 9,
+		analogClick : 10,
+		ranalogClick : 11,
+		dpadUp : 12,
+		dpadDown : 13,
+		dpadLeft : 14,
+		dpadRight : 15,
+		analogX : 17,
+		analogY : 18,
+		ranalogX : 19,
+		ranalogY : 20,
+		names : ["B","A","Y","X","LB","RB","LT","RT","Select","Start","LCLK","RCLK","DUp","DDown","DLeft","DRight","LX","LY","RX","RY"],
+	};
+	/**
 	  	Mapping for Dualshock 4
 	**/
 	public static var CONFIG_JS_DS4 = {
@@ -204,8 +234,18 @@ class Pad {
 			case "054c-05c4-Wireless Controller" | "054c-09cc-Wireless Controller":
 				return CONFIG_JS_DS4_FF;
 			default:
-				return CONFIG_JS_STD;
+				return usbVendor(name) == "057e" ? CONFIG_JS_NINTENDO : CONFIG_JS_STD;
 		}
+	}
+
+	// Browsers report the USB ids in the gamepad id, in two flavours:
+	// Firefox "057e-2009-Pro Controller", Chrome "Pro Controller (Vendor: 057e Product: 2009)"
+	static function usbVendor( name : String ) : Null<String> {
+		var firefox = ~/^([0-9a-f]{4})-[0-9a-f]{4}-/i;
+		if( firefox.match(name) ) return firefox.matched(1).toLowerCase();
+		var chrome = ~/vendor:\s*([0-9a-f]{4})/i;
+		if( chrome.match(name) ) return chrome.matched(1).toLowerCase();
+		return null;
 	}
 	#end
 
