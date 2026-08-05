@@ -141,6 +141,10 @@ class Window {
 		element.addEventListener("keypress", onKeyPress);
 		element.addEventListener("blur", onFocus.bind(false));
 		element.addEventListener("focus", onFocus.bind(true));
+		// A tab switch blurs the window, not the canvas: without this the lost
+		// keyups leave keys stuck down.
+		if( element != js.Browser.window )
+			js.Browser.window.addEventListener("blur", () -> event(new Event(EFocusLost)));
 		element.addEventListener("pointerdown", onPointerDown);
 		element.addEventListener("pointerup", onPointerUp);
 
